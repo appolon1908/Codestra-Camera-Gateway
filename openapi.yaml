@@ -1,0 +1,33 @@
+openapi: 3.1.0
+info:
+  title: Codestra Camera Gateway API
+  version: 0.1.0
+  description: Standalone Codestra service. Cross-system access is mediated by Middleware V3.
+servers:
+  - url: http://localhost
+paths:
+  /healthz:
+    get:
+      operationId: health
+      responses:
+        "200":
+          description: Healthy
+  /readyz:
+    get:
+      operationId: ready
+      responses:
+        "200":
+          description: Ready
+  /v1/capabilities:
+    get:
+      operationId: capabilities
+      responses:
+        "200":
+          description: Service capabilities
+  /v1/cameras/status:
+    get:
+      operationId: serviceStatus
+      responses:
+        "200":
+          description: Service-local status
+components: {}
