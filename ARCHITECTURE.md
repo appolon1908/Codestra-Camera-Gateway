@@ -27,6 +27,7 @@ Service-local API prefix: /v1/cameras
 Required operational endpoints:
 - GET /healthz
 - GET /readyz
+- GET /health/ready (Middleware V3 readiness alias)
 - GET /metrics
 - GET /v1/capabilities
 

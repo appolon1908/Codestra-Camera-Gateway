@@ -1,33 +1,1573 @@
 openapi: 3.1.0
 info:
   title: Codestra Camera Gateway API
-  version: 0.1.0
-  description: Standalone Codestra service. Cross-system access is mediated by Middleware V3.
+  description: 'Standalone ONVIF/RTSP camera gateway. Owns camera connectivity only.
+
+
+    Middleware V3 is the sole cross-system integration authority: callers reach this API only
+
+    through Caddy -> Kong -> Middleware V3. Camera credentials are OpenBao secret references;
+
+    plaintext passwords are never accepted, stored or returned.
+
+    '
+  version: 0.2.0
 servers:
-  - url: http://localhost
+- url: http://localhost:8080
+  description: Local development
 paths:
   /healthz:
     get:
+      tags:
+      - operations
+      summary: Healthz
+      description: 'Liveness: the process is running. Does not contact cameras.'
       operationId: health
       responses:
-        "200":
-          description: Healthy
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
   /readyz:
     get:
+      tags:
+      - operations
+      summary: Readyz
+      description: 'Readiness: registry, media tooling and secret backend are available.'
       operationId: ready
       responses:
-        "200":
-          description: Ready
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+        '503':
+          description: Not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+  /health/ready:
+    get:
+      tags:
+      - operations
+      summary: Readyz
+      description: 'Readiness: registry, media tooling and secret backend are available.'
+      operationId: healthReadyAlias
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Readiness'
+  /metrics:
+    get:
+      tags:
+      - operations
+      summary: Metrics
+      description: Prometheus exposition. Private network only; never route through public ingress.
+      operationId: metrics
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain; version=1.0.0; charset=utf-8: {}
   /v1/capabilities:
     get:
+      tags:
+      - operations
+      summary: Capabilities
       operationId: capabilities
       responses:
-        "200":
-          description: Service capabilities
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Capabilities'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - HTTPBearer: []
+  /v1/onvif/discovery:
+    post:
+      tags:
+      - onvif
+      summary: Discover
+      description: 'WS-Discovery multicast probe of the local segment. Development/operator use only;
+
+        disabled by default and refused in production configuration.'
+      operationId: discoverOnvifDevices
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiscoveryResult'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - HTTPBearer: []
   /v1/cameras/status:
     get:
+      tags:
+      - cameras
+      summary: Camera Status Summary
+      description: Tenant-scoped summary of camera health as last observed by this service.
       operationId: serviceStatus
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
       responses:
-        "200":
-          description: Service-local status
-components: {}
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusSummary'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras:
+    post:
+      tags:
+      - cameras
+      summary: Create Camera
+      description: 'Register a camera. Credentials are accepted only as OpenBao secret references;
+
+        any plaintext password field is rejected with 422. camera_ref is unique per tenant,
+
+        making retries safe (a duplicate returns 409 with no effect).'
+      operationId: createCamera
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CameraCreate'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags:
+      - cameras
+      summary: List Cameras
+      operationId: listCameras
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraList'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}:
+    get:
+      tags:
+      - cameras
+      summary: Get Camera
+      operationId: getCamera
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    patch:
+      tags:
+      - cameras
+      summary: Update Camera
+      description: Partially update a camera. Changing host, rtsp, onvif or credentials resets health.
+      operationId: updateCamera
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CameraUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Camera'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+      - cameras
+      summary: Delete Camera
+      operationId: deleteCamera
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '204':
+          description: Successful Response
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/health:
+    get:
+      tags:
+      - cameras
+      summary: Camera Health
+      description: 'Last observed health: status, last frame timestamp, dimensions and codec/profile.'
+      operationId: getCameraHealth
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraHealth'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/onvif/probe:
+    post:
+      tags:
+      - cameras
+      summary: Probe Onvif
+      description: 'Query the camera over ONVIF for device information, media profiles and stream paths.
+
+        Advertised addresses are reduced to paths on the registered host (no SSRF).'
+      operationId: probeCameraOnvif
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnvifProbeResult'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/stream-test:
+    post:
+      tags:
+      - cameras
+      summary: Stream Test
+      description: Open the RTSP stream and report codec, profile, dimensions and frame rate.
+      operationId: testCameraStream
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamTestResult'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/snapshot:
+    get:
+      tags:
+      - cameras
+      summary: Snapshot
+      description: Capture one frame over RTSP. Frames are never stored by the gateway.
+      operationId: getCameraSnapshot
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: A single JPEG frame. X-Frame-* headers carry capture metadata.
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+          headers:
+            X-Frame-Timestamp:
+              schema:
+                type: string
+                format: date-time
+            X-Frame-Width:
+              schema:
+                type: integer
+            X-Frame-Height:
+              schema:
+                type: integer
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/preview.mjpeg:
+    get:
+      tags:
+      - cameras
+      summary: Preview
+      description: 'LOCAL/OPERATOR USE ONLY. Disabled unless CAMERA_GATEWAY_ENABLE_MJPEG_PREVIEW=true.
+
+        Bounded by session count, duration, frame rate and resolution. Not an integration
+
+        surface for Middleware or other services.'
+      operationId: previewCameraMjpeg
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Operator-only, time-limited, low-rate MJPEG preview (boundary=frame).
+          content:
+            multipart/x-mixed-replace:
+              schema:
+                type: string
+                format: binary
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    Camera:
+      properties:
+        id:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          title: Id
+        tenant_id:
+          type: string
+          title: Tenant Id
+        camera_ref:
+          type: string
+          title: Camera Ref
+        name:
+          type: string
+          title: Name
+        vendor:
+          $ref: '#/components/schemas/Vendor'
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        host:
+          type: string
+          title: Host
+        rtsp:
+          $ref: '#/components/schemas/RtspSettings'
+        onvif:
+          $ref: '#/components/schemas/OnvifSettings'
+        credentials:
+          anyOf:
+          - $ref: '#/components/schemas/CameraCredentials'
+          - type: 'null'
+        enabled:
+          type: boolean
+          title: Enabled
+        labels:
+          additionalProperties:
+            type: string
+          type: object
+          title: Labels
+        created_at:
+          type: string
+          format: date-time
+          title: Created At
+        updated_at:
+          type: string
+          format: date-time
+          title: Updated At
+        health:
+          $ref: '#/components/schemas/CameraHealth'
+        onvif_probe:
+          anyOf:
+          - $ref: '#/components/schemas/OnvifProbeResult'
+          - type: 'null'
+      type: object
+      required:
+      - id
+      - tenant_id
+      - camera_ref
+      - name
+      - vendor
+      - model
+      - host
+      - rtsp
+      - onvif
+      - credentials
+      - enabled
+      - labels
+      - created_at
+      - updated_at
+      - health
+      title: Camera
+    CameraCreate:
+      properties:
+        camera_ref:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$
+          title: Camera Ref
+          description: Opaque tenant-scoped handle used by Middleware V3.
+        name:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Name
+        vendor:
+          $ref: '#/components/schemas/Vendor'
+          default: generic
+        model:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Model
+          examples:
+          - H8c
+        host:
+          type: string
+          maxLength: 253
+          minLength: 1
+          title: Host
+        rtsp:
+          $ref: '#/components/schemas/RtspSettings'
+        onvif:
+          $ref: '#/components/schemas/OnvifSettings'
+        credentials:
+          anyOf:
+          - $ref: '#/components/schemas/CameraCredentials'
+          - type: 'null'
+        enabled:
+          type: boolean
+          title: Enabled
+          default: true
+        labels:
+          patternProperties:
+            ^[a-z0-9_.\-]{1,63}$:
+              type: string
+              maxLength: 128
+          type: object
+          maxProperties: 32
+          title: Labels
+      additionalProperties: false
+      type: object
+      required:
+      - camera_ref
+      - name
+      - host
+      title: CameraCreate
+    CameraCredentials:
+      properties:
+        username:
+          type: string
+          pattern: ^[A-Za-z0-9_.\-]{1,64}$
+          title: Username
+        password_ref:
+          type: string
+          maxLength: 1024
+          pattern: ^openbao://[A-Za-z0-9][A-Za-z0-9_.-]{0,127}(?:/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}){1,15}#[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$
+          title: Password Ref
+          description: 'OpenBao-compatible secret reference: openbao://<mount>/<path>#<key>. Plaintext
+            secrets are rejected.'
+          examples:
+          - openbao://kv/cameras/lobby-h8c#password
+      additionalProperties: false
+      type: object
+      required:
+      - username
+      - password_ref
+      title: CameraCredentials
+    CameraHealth:
+      properties:
+        status:
+          $ref: '#/components/schemas/HealthStatus'
+          default: unknown
+        last_checked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Checked At
+        last_success_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Success At
+        last_frame_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Frame At
+        last_error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error Code
+        media:
+          $ref: '#/components/schemas/MediaInfo'
+      type: object
+      title: CameraHealth
+    CameraList:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/Camera'
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - total
+      - limit
+      - offset
+      title: CameraList
+    CameraUpdate:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 128
+            minLength: 1
+          - type: 'null'
+          title: Name
+        model:
+          anyOf:
+          - type: string
+            maxLength: 64
+          - type: 'null'
+          title: Model
+        host:
+          anyOf:
+          - type: string
+            maxLength: 253
+            minLength: 1
+          - type: 'null'
+          title: Host
+        rtsp:
+          anyOf:
+          - $ref: '#/components/schemas/RtspSettings'
+          - type: 'null'
+        onvif:
+          anyOf:
+          - $ref: '#/components/schemas/OnvifSettings'
+          - type: 'null'
+        credentials:
+          anyOf:
+          - $ref: '#/components/schemas/CameraCredentials'
+          - type: 'null'
+        enabled:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+        labels:
+          anyOf:
+          - patternProperties:
+              ^[a-z0-9_.\-]{1,63}$:
+                type: string
+                maxLength: 128
+            type: object
+            maxProperties: 32
+          - type: 'null'
+          title: Labels
+      additionalProperties: false
+      type: object
+      title: CameraUpdate
+    Capabilities:
+      properties:
+        service:
+          type: string
+          title: Service
+        version:
+          type: string
+          title: Version
+        api_version:
+          type: string
+          const: v1
+          title: Api Version
+          default: v1
+        authority:
+          type: string
+          title: Authority
+        protocols:
+          items:
+            type: string
+          type: array
+          title: Protocols
+        vendors:
+          items:
+            $ref: '#/components/schemas/Vendor'
+          type: array
+          title: Vendors
+        secret_ref_schemes:
+          items:
+            type: string
+          type: array
+          title: Secret Ref Schemes
+        features:
+          additionalProperties:
+            type: boolean
+          type: object
+          title: Features
+        limits:
+          additionalProperties:
+            type: number
+          type: object
+          title: Limits
+      type: object
+      required:
+      - service
+      - version
+      - authority
+      - protocols
+      - vendors
+      - secret_ref_schemes
+      - features
+      - limits
+      title: Capabilities
+    DiscoveredDevice:
+      properties:
+        endpoint_reference:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Endpoint Reference
+        xaddrs:
+          items:
+            type: string
+          type: array
+          title: Xaddrs
+        scopes:
+          items:
+            type: string
+          type: array
+          title: Scopes
+        types:
+          items:
+            type: string
+          type: array
+          title: Types
+      type: object
+      required:
+      - xaddrs
+      - scopes
+      - types
+      title: DiscoveredDevice
+    DiscoveryResult:
+      properties:
+        discovered_at:
+          type: string
+          format: date-time
+          title: Discovered At
+        timeout_s:
+          type: number
+          title: Timeout S
+        devices:
+          items:
+            $ref: '#/components/schemas/DiscoveredDevice'
+          type: array
+          title: Devices
+      type: object
+      required:
+      - discovered_at
+      - timeout_s
+      - devices
+      title: DiscoveryResult
+    ErrorDetail:
+      properties:
+        code:
+          type: string
+          title: Code
+        message:
+          type: string
+          title: Message
+        request_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Request Id
+      type: object
+      required:
+      - code
+      - message
+      title: ErrorDetail
+    ErrorResponse:
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+      type: object
+      required:
+      - error
+      title: ErrorResponse
+    Health:
+      properties:
+        status:
+          type: string
+          const: ok
+          title: Status
+          default: ok
+        service:
+          type: string
+          title: Service
+        version:
+          type: string
+          title: Version
+      type: object
+      required:
+      - service
+      - version
+      title: Health
+    HealthStatus:
+      type: string
+      enum:
+      - unknown
+      - online
+      - offline
+      - auth_failed
+      - error
+      title: HealthStatus
+    MediaInfo:
+      properties:
+        codec:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Codec
+        profile:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Profile
+        width:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Width
+        height:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Height
+        fps:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Fps
+        pixel_format:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pixel Format
+      type: object
+      title: MediaInfo
+    OnvifDeviceInfo:
+      properties:
+        manufacturer:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Manufacturer
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        firmware_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Firmware Version
+        serial_number:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Serial Number
+        hardware_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Hardware Id
+      type: object
+      title: OnvifDeviceInfo
+    OnvifProbeResult:
+      properties:
+        probed_at:
+          type: string
+          format: date-time
+          title: Probed At
+        device:
+          $ref: '#/components/schemas/OnvifDeviceInfo'
+        media_service_path:
+          type: string
+          title: Media Service Path
+        profiles:
+          items:
+            $ref: '#/components/schemas/OnvifProfile'
+          type: array
+          title: Profiles
+      type: object
+      required:
+      - probed_at
+      - device
+      - media_service_path
+      - profiles
+      title: OnvifProbeResult
+    OnvifProfile:
+      properties:
+        token:
+          type: string
+          title: Token
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        video_encoding:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Video Encoding
+        width:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Width
+        height:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Height
+        fps:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Fps
+        bitrate_kbps:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Bitrate Kbps
+        encoding_profile:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Encoding Profile
+        stream_path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Stream Path
+          description: RTSP path from GetStreamUri, normalized to the registered camera host. Never contains
+            credentials.
+        reported_host_mismatch:
+          type: boolean
+          title: Reported Host Mismatch
+          description: True when the device advertised a stream host different from the registered host.
+          default: false
+      type: object
+      required:
+      - token
+      title: OnvifProfile
+    OnvifSettings:
+      properties:
+        enabled:
+          type: boolean
+          title: Enabled
+          default: false
+        port:
+          type: integer
+          maximum: 65535.0
+          minimum: 1.0
+          title: Port
+          default: 80
+        device_service_path:
+          type: string
+          title: Device Service Path
+          default: /onvif/device_service
+      additionalProperties: false
+      type: object
+      title: OnvifSettings
+    Readiness:
+      properties:
+        status:
+          type: string
+          enum:
+          - ready
+          - not_ready
+          title: Status
+        checks:
+          items:
+            $ref: '#/components/schemas/ReadinessCheck'
+          type: array
+          title: Checks
+      type: object
+      required:
+      - status
+      - checks
+      title: Readiness
+    ReadinessCheck:
+      properties:
+        name:
+          type: string
+          title: Name
+        ok:
+          type: boolean
+          title: Ok
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+      type: object
+      required:
+      - name
+      - ok
+      title: ReadinessCheck
+    RtspSettings:
+      properties:
+        port:
+          type: integer
+          maximum: 65535.0
+          minimum: 1.0
+          title: Port
+          default: 554
+        path:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Path
+          description: Stream path. Optional when a vendor default applies or ONVIF is enabled.
+          examples:
+          - /h264/ch1/main/av_stream
+        transport:
+          $ref: '#/components/schemas/RtspTransport'
+          default: tcp
+        stream:
+          $ref: '#/components/schemas/StreamVariant'
+          default: main
+      additionalProperties: false
+      type: object
+      title: RtspSettings
+    RtspTransport:
+      type: string
+      enum:
+      - tcp
+      - udp
+      title: RtspTransport
+    StatusSummary:
+      properties:
+        total:
+          type: integer
+          title: Total
+        enabled:
+          type: integer
+          title: Enabled
+        by_status:
+          additionalProperties:
+            type: integer
+          propertyNames:
+            $ref: '#/components/schemas/HealthStatus'
+          type: object
+          title: By Status
+      type: object
+      required:
+      - total
+      - enabled
+      - by_status
+      title: StatusSummary
+    StreamTestResult:
+      properties:
+        ok:
+          type: boolean
+          const: true
+          title: Ok
+          default: true
+        camera_id:
+          type: string
+          title: Camera Id
+        tested_at:
+          type: string
+          format: date-time
+          title: Tested At
+        latency_ms:
+          type: integer
+          title: Latency Ms
+        stream:
+          $ref: '#/components/schemas/StreamVariant'
+        transport:
+          $ref: '#/components/schemas/RtspTransport'
+        media:
+          $ref: '#/components/schemas/MediaInfo'
+      type: object
+      required:
+      - camera_id
+      - tested_at
+      - latency_ms
+      - stream
+      - transport
+      - media
+      title: StreamTestResult
+    StreamVariant:
+      type: string
+      enum:
+      - main
+      - sub
+      title: StreamVariant
+    Vendor:
+      type: string
+      enum:
+      - generic
+      - ezviz
+      title: Vendor
+  securitySchemes:
+    HTTPBearer:
+      type: http
+      description: Service token presented by Middleware V3
+      scheme: bearer
