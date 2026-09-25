@@ -107,3 +107,99 @@ class HealthEvent(BaseModel):
         "repeated_frame_heuristic",
     ]
     heuristic: bool = False
+
+
+class RollingBufferStatus(BaseModel):
+    camera_id: str
+    enabled: bool
+    stored_bytes: int = 0
+    reserved_bytes: int = 0
+    segment_count: int = 0
+    oldest_observed_at: datetime | None = None
+    newest_observed_at: datetime | None = None
+    max_bytes: int
+    retention_s: int
+    segment_duration_s: int
+    last_error_code: str | None = None
+
+
+class PreEventRequest(Strict):
+    command_ref: Reference
+    event_at: datetime
+    pre_event_s: int = Field(default=10, ge=1, le=300)
+    max_bytes: int = Field(default=16 * 1024 * 1024, ge=1024, le=64 * 1024 * 1024)
+
+
+class CoveredInterval(BaseModel):
+    started_at: datetime
+    ended_at: datetime
+
+
+class PreEventManifest(BaseModel):
+    id: str
+    camera_id: str
+    command_ref: str
+    requested_at: datetime
+    event_at: datetime
+    requested_pre_event_s: int
+    status: Literal["available", "unavailable"]
+    segment_ids: list[str] = Field(default_factory=list)
+    covered_intervals: list[CoveredInterval] = Field(default_factory=list)
+    gaps: list[CoveredInterval] = Field(default_factory=list)
+    expires_at: datetime
+
+
+class NormalizedCameraEvent(BaseModel):
+    id: int
+    camera_id: str
+    observed_at: datetime
+    kind: Literal["motion", "scene_change", "tamper", "health"]
+    source: Literal["gateway_health", "frame_delta", "camera_native"] = "gateway_health"
+    source_version: str = "camera-gateway.v1"
+    heuristic: bool = False
+    confidence_kind: Literal["heuristic", "observed"] = "observed"
+    score: float | None = Field(default=None, ge=0, le=1)
+    signal: str
+
+
+class DeviceInventory(BaseModel):
+    camera_id: str
+    manufacturer: str | None = None
+    model: str | None = None
+    firmware_version: str | None = None
+    serial_number: str | None = None
+    hardware_id: str | None = None
+    capabilities: list[str] = Field(default_factory=list)
+    refreshed_at: datetime | None = None
+    stale: bool = True
+
+
+class CredentialRotationStatus(BaseModel):
+    camera_id: str
+    secret_ref_present: bool
+    secret_ref_fingerprint: str | None = None
+    current_ref_version: str | None = None
+    lease_expires_at: datetime | None = None
+    last_successful_auth: datetime | None = None
+    next_rotation_due: datetime | None = None
+    reload_supported: bool = True
+
+
+class CredentialReloadRequest(Strict):
+    command_ref: Reference
+
+
+class CredentialReloadResult(BaseModel):
+    command_ref: str
+    status: Literal["completed"] = "completed"
+    authenticated_at: datetime
+
+
+class ClockDriftHealth(BaseModel):
+    camera_id: str
+    supported: bool
+    observed_at: datetime
+    drift_ms: int | None = None
+    stale: bool = False
+    source: Literal["onvif-get-system-date-time"] = "onvif-get-system-date-time"
+    mutation_performed: Literal[False] = False

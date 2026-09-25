@@ -63,6 +63,22 @@ class Settings(BaseSettings):
     clip_max_files: int = Field(default=100, ge=1, le=1000)
     frame_stale_s: int = Field(default=60, ge=1, le=86400)
 
+    # Missions 6-10: local bounded metadata/evidence surfaces. Rolling capture is
+    # fail-closed and disabled by default; no route accepts filesystem paths.
+    enable_rolling_buffer: bool = False
+    rolling_buffer_max_bytes: int = Field(
+        default=256 * 1024 * 1024,
+        ge=1024 * 1024,
+        le=8 * 1024 * 1024 * 1024,
+    )
+    rolling_buffer_retention_s: int = Field(default=300, ge=30, le=86400)
+    rolling_buffer_segment_max_bytes: int = Field(default=16 * 1024 * 1024, ge=1024, le=64 * 1024 * 1024)
+    rolling_buffer_segment_duration_s: int = Field(default=5, ge=1, le=30)
+    camera_event_retention_count: int = Field(default=500, ge=50, le=5000)
+    inventory_stale_s: int = Field(default=3600, ge=60, le=604800)
+    credential_rotation_interval_s: int = Field(default=30 * 24 * 3600, ge=3600, le=365 * 24 * 3600)
+    clock_drift_stale_s: int = Field(default=300, ge=30, le=86400)
+
     enable_ws_discovery: bool = False
     ws_discovery_timeout_s: float = Field(default=3.0, gt=0, le=15)
 

@@ -4,7 +4,15 @@ import json
 import uuid
 
 from camera_gateway.errors import CameraNotFound, Conflict
-from camera_gateway.mission_models import Coverage, CoverageInput, Group, GroupInput, HealthEvent
+from camera_gateway.mission_models import (
+    Coverage,
+    CoverageInput,
+    Group,
+    GroupInput,
+    HealthEvent,
+    NormalizedCameraEvent,
+    PreEventManifest,
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS camera_groups (
@@ -30,6 +38,20 @@ CREATE TABLE IF NOT EXISTS camera_clips (
 CREATE TABLE IF NOT EXISTS health_events (
  id INTEGER PRIMARY KEY AUTOINCREMENT, camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
  body TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS rolling_segments (
+ id TEXT PRIMARY KEY, tenant TEXT NOT NULL, camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+ started_at TEXT NOT NULL, ended_at TEXT NOT NULL, size_bytes INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS pre_event_manifests (
+ id TEXT PRIMARY KEY, tenant TEXT NOT NULL, camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+ command_ref TEXT NOT NULL, body TEXT NOT NULL,
+ UNIQUE(tenant, camera_id, command_ref)
+);
+CREATE TABLE IF NOT EXISTS normalized_camera_events (
+ id INTEGER PRIMARY KEY AUTOINCREMENT, tenant TEXT NOT NULL,
+ camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+ observed_at TEXT NOT NULL, body TEXT NOT NULL
 );
 """
 
@@ -179,3 +201,73 @@ class MissionStore:
                 (camera_id, limit),
             ).fetchall()
         return [HealthEvent.model_validate_json(r["body"]) for r in rows]
+
+    def rolling_segments(self, tenant, camera_id, start, end):
+        self.cameras.get(tenant, camera_id)
+        with self.lock:
+            rows = self.conn.execute(
+                "SELECT id, started_at, ended_at, size_bytes FROM rolling_segments "
+                "WHERE tenant=? AND camera_id=? AND ended_at>=? AND started_at<=? ORDER BY started_at",
+                (tenant, camera_id, start.isoformat(), end.isoformat()),
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+    def rolling_totals(self, tenant, camera_id):
+        self.cameras.get(tenant, camera_id)
+        with self.lock:
+            row = self.conn.execute(
+                "SELECT count(*) AS n, coalesce(sum(size_bytes),0) AS bytes, "
+                "min(started_at) AS oldest, max(ended_at) AS newest "
+                "FROM rolling_segments WHERE tenant=? AND camera_id=?",
+                (tenant, camera_id),
+            ).fetchone()
+        return dict(row)
+
+    def save_manifest(self, tenant, manifest: PreEventManifest):
+        with self.lock:
+            self.conn.execute(
+                "INSERT INTO pre_event_manifests(id,tenant,camera_id,command_ref,body) VALUES(?,?,?,?,?) "
+                "ON CONFLICT(tenant,camera_id,command_ref) DO UPDATE SET body=excluded.body",
+                (manifest.id, tenant, manifest.camera_id, manifest.command_ref, manifest.model_dump_json()),
+            )
+
+    def manifest_by_command(self, tenant, camera_id, command_ref):
+        with self.lock:
+            row = self.conn.execute(
+                "SELECT body FROM pre_event_manifests WHERE tenant=? AND camera_id=? AND command_ref=?",
+                (tenant, camera_id, command_ref),
+            ).fetchone()
+        return None if row is None else PreEventManifest.model_validate_json(row["body"])
+
+    def normalized_event(self, tenant, camera_id, event):
+        with self.lock:
+            cur = self.conn.execute(
+                "INSERT INTO normalized_camera_events(tenant,camera_id,observed_at,body) VALUES(?,?,?,?)",
+                (
+                    tenant,
+                    camera_id,
+                    event.observed_at.isoformat(),
+                    event.model_dump_json(exclude={"id", "camera_id"}),
+                ),
+            )
+            event.id = int(cur.lastrowid)
+            self.conn.execute(
+                "DELETE FROM normalized_camera_events WHERE camera_id=? AND id NOT IN "
+                "(SELECT id FROM normalized_camera_events WHERE camera_id=? ORDER BY id DESC LIMIT 500)",
+                (camera_id, camera_id),
+            )
+        return event
+
+    def normalized_events(self, tenant, camera_id, limit, offset):
+        self.cameras.get(tenant, camera_id)
+        with self.lock:
+            rows = self.conn.execute(
+                "SELECT id, body FROM normalized_camera_events WHERE tenant=? AND camera_id=? "
+                "ORDER BY id DESC LIMIT ? OFFSET ?",
+                (tenant, camera_id, limit, offset),
+            ).fetchall()
+        result = []
+        for row in rows:
+            body = json.loads(row["body"])
+            result.append(NormalizedCameraEvent(id=row["id"], camera_id=camera_id, **body))
+        return result

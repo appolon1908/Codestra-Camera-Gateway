@@ -9,15 +9,24 @@ from camera_gateway.api.routes import CameraId, _errors
 from camera_gateway.mission_models import (
     Clip,
     ClipRequest,
+    ClockDriftHealth,
     CommandResult,
     Coverage,
     CoverageInput,
+    CredentialReloadRequest,
+    CredentialReloadResult,
+    CredentialRotationStatus,
+    DeviceInventory,
     Group,
     GroupInput,
     HealthEvent,
     Membership,
+    NormalizedCameraEvent,
+    PreEventManifest,
+    PreEventRequest,
     PtzCapability,
     PtzCommand,
+    RollingBufferStatus,
 )
 
 router = APIRouter(
@@ -153,3 +162,74 @@ def health_history(camera_id: CameraId, tenant: Tenant, service: Service, limit:
     camera = service.store.get(tenant, camera_id)
     service.missions.check_stale(camera)
     return service.missions.store.history(tenant, camera_id, limit)
+
+@router.get("/cameras/{camera_id}/buffer", response_model=RollingBufferStatus, tags=["buffer"])
+def rolling_buffer_status(camera_id: CameraId, tenant: Tenant, service: Service):
+    """Read-only bounded rolling-buffer metadata. No filenames or media bytes are exposed."""
+    return service.missions.buffer_status(tenant, camera_id)
+
+
+@router.post(
+    "/internal/cameras/{camera_id}/pre-event",
+    response_model=PreEventManifest,
+    tags=["private-effects"],
+)
+def request_pre_event(camera_id: CameraId, body: PreEventRequest, tenant: Tenant, service: Service):
+    """Build a manifest from already-retained segments only; never captures replacement footage."""
+    return service.missions.pre_event(tenant, camera_id, body)
+
+
+@router.get(
+    "/cameras/{camera_id}/events",
+    response_model=list[NormalizedCameraEvent],
+    tags=["events"],
+)
+def camera_events(
+    camera_id: CameraId,
+    tenant: Tenant,
+    service: Service,
+    limit: Limit = 50,
+    offset: Offset = 0,
+):
+    """Normalized health/motion/scene observations. Heuristic signals are explicitly marked."""
+    return service.missions.events(tenant, camera_id, limit, offset)
+
+
+@router.get("/cameras/{camera_id}/inventory", response_model=DeviceInventory, tags=["inventory"])
+def camera_inventory(camera_id: CameraId, tenant: Tenant, service: Service):
+    return service.missions.inventory(tenant, camera_id)
+
+
+@router.post("/cameras/{camera_id}/inventory/refresh", response_model=DeviceInventory, tags=["inventory"])
+async def refresh_camera_inventory(camera_id: CameraId, tenant: Tenant, service: Service):
+    await service.probe_onvif(tenant, camera_id)
+    return service.missions.inventory(tenant, camera_id)
+
+
+@router.get(
+    "/cameras/{camera_id}/credentials/rotation-status",
+    response_model=CredentialRotationStatus,
+    tags=["credentials"],
+)
+def credential_rotation_status(camera_id: CameraId, tenant: Tenant, service: Service):
+    return service.missions.credential_status(tenant, camera_id)
+
+
+@router.post(
+    "/internal/cameras/{camera_id}/credentials/reload",
+    response_model=CredentialReloadResult,
+    tags=["private-effects"],
+)
+async def credential_reload(
+    camera_id: CameraId,
+    body: CredentialReloadRequest,
+    tenant: Tenant,
+    service: Service,
+):
+    return await service.missions.reload_credentials(tenant, camera_id, body)
+
+
+@router.get("/cameras/{camera_id}/clock-drift", response_model=ClockDriftHealth, tags=["health"])
+async def clock_drift(camera_id: CameraId, tenant: Tenant, service: Service):
+    """Measure device timestamp drift. This endpoint never mutates the camera clock."""
+    return await service.missions.clock_drift(tenant, camera_id)

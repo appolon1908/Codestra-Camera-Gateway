@@ -457,3 +457,78 @@ def test_clip_orphan_cleanup(make_client):
     orphan.write_bytes(b"partial")
     client.app.state.service.missions.maintenance()
     assert not orphan.exists()
+
+
+def test_missions_6_buffer_manifest_is_bounded_and_path_free(client, create_camera):
+    camera = create_camera()["id"]
+    status = client.get(f"/v1/cameras/{camera}/buffer")
+    assert status.status_code == 200
+    body = status.json()
+    assert body["enabled"] is False
+    assert body["segment_count"] == 0
+    assert "path" not in body
+    request = {
+        "command_ref": "pre-event-1",
+        "event_at": datetime.now(UTC).isoformat(),
+        "pre_event_s": 10,
+        "max_bytes": 4096,
+    }
+    first = client.post(f"/v1/internal/cameras/{camera}/pre-event", json=request)
+    assert first.status_code == 200
+    manifest = first.json()
+    assert manifest["status"] == "unavailable"
+    assert manifest["segment_ids"] == []
+    assert manifest["gaps"]
+    assert not any(key in manifest for key in ("path", "url", "filename"))
+    assert client.post(f"/v1/internal/cameras/{camera}/pre-event", json=request).json() == manifest
+
+
+def test_missions_7_normalized_event_feed_marks_heuristics(client, create_camera):
+    camera_id = create_camera()["id"]
+    camera = client.app.state.store.get("tenant-a", camera_id)
+    client.app.state.service.missions.signal(camera, "scene_change_heuristic", True)
+    response = client.get(f"/v1/cameras/{camera_id}/events?limit=10&offset=0")
+    assert response.status_code == 200
+    event = response.json()[0]
+    assert event["kind"] == "scene_change"
+    assert event["source"] == "frame_delta"
+    assert event["heuristic"] is True
+    assert event["confidence_kind"] == "heuristic"
+    assert "subject_id" not in event and "person" not in event
+
+
+def test_missions_8_inventory_refresh_contains_no_credentials(client, onvif_device):
+    camera_id = register(client)
+    before = client.get(f"/v1/cameras/{camera_id}/inventory")
+    assert before.status_code == 200 and before.json()["stale"] is True
+    refreshed = client.post(f"/v1/cameras/{camera_id}/inventory/refresh")
+    assert refreshed.status_code == 200, refreshed.text
+    body = refreshed.json()
+    assert body["camera_id"] == camera_id
+    assert body["refreshed_at"]
+    serialized = json.dumps(body).lower()
+    assert "password" not in serialized and "credential" not in serialized
+
+
+def test_missions_9_rotation_status_never_exposes_secret_ref(client):
+    camera_id = register(client)
+    response = client.get(f"/v1/cameras/{camera_id}/credentials/rotation-status")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["secret_ref_present"] is True
+    assert body["secret_ref_fingerprint"]
+    serialized = json.dumps(body)
+    assert "openbao://" not in serialized
+    assert "lobby#password" not in serialized
+
+
+def test_missions_10_clock_drift_is_read_only(client, onvif_device):
+    camera_id = register(client)
+    response = client.get(f"/v1/cameras/{camera_id}/clock-drift")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["camera_id"] == camera_id
+    assert body["mutation_performed"] is False
+    assert body["source"] == "onvif-get-system-date-time"
+    actions = [onvif_device.action(r) for r in onvif_device.requests]
+    assert "SetSystemDateAndTime" not in actions

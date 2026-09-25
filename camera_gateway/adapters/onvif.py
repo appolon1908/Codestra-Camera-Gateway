@@ -239,6 +239,10 @@ class OnvifClient:
             return
         self._clock_offset = device_now - datetime.now(UTC)
 
+    @property
+    def clock_offset_seconds(self) -> float | None:
+        return None if self._clock_offset is None else self._clock_offset.total_seconds()
+
     async def device_information(self) -> OnvifDeviceInfo:
         body = await self._call(
             self._device_path, f"{NS_DEVICE}/GetDeviceInformation", "<tds:GetDeviceInformation/>"
