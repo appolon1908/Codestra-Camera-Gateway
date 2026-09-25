@@ -1,0 +1,67 @@
+name: Repository foundation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  repository-foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Codestra integration contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s .codestra/MIDDLEWARE-INTEGRATION-CONTRACT.md
+          grep -Fq 'Middleware integration API :8095' .codestra/MIDDLEWARE-INTEGRATION-CONTRACT.md
+          grep -Fq '/platform/v1 command kernel' .codestra/MIDDLEWARE-INTEGRATION-CONTRACT.md
+      - name: Reject unresolved merge markers
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nE '^(<<<<<<< |>>>>>>> )' -- . ':!*.md' ':!*.txt'; then
+            echo 'Unresolved merge markers found'
+            exit 1
+          fi
+      - name: Validate tracked JSON and TOML metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, pathlib, subprocess, sys, tomllib
+          files = subprocess.check_output(["git","ls-files"], text=True).splitlines()
+          failures = []
+          for name in files:
+              path = pathlib.Path(name)
+              try:
+                  if path.suffix.lower() == ".json":
+                      json.loads(path.read_text(encoding="utf-8"))
+                  elif path.suffix.lower() == ".toml":
+                      tomllib.loads(path.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  failures.append(f"{name}: {exc}")
+          if failures:
+              print("\n".join(failures))
+              sys.exit(1)
+          print(f"validated metadata files across {len(files)} tracked paths")
+          PY
+      - name: Validate package manifest when present
+        shell: bash
+        run: |
+          set -euo pipefail
+          if test -f package.json; then
+            node -e "JSON.parse(require('fs').readFileSync('package.json','utf8')); console.log('package.json: valid')"
+          fi
+      - name: Report detected repository stack
+        shell: bash
+        run: |
+          set -euo pipefail
+          for f in pyproject.toml requirements.txt package.json go.mod Cargo.toml pom.xml Dockerfile docker-compose.yml compose.yml; do
+            test -e "$f" && echo "FOUND $f" || true
+          done
