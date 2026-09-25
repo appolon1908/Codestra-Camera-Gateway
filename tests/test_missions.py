@@ -532,3 +532,117 @@ def test_missions_10_clock_drift_is_read_only(client, onvif_device):
     assert body["source"] == "onvif-get-system-date-time"
     actions = [onvif_device.action(r) for r in onvif_device.requests]
     assert "SetSystemDateAndTime" not in actions
+
+
+def test_mission_11_configuration_snapshot_is_sanitized(client, create_camera):
+    camera = create_camera(labels={"site": "hq"})["id"]
+    response = client.get(f"/v1/cameras/{camera}/configuration-snapshot")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["camera_id"] == camera
+    assert body["config_sha256"]
+    assert body["labels_count"] == 1
+    assert "password" not in json.dumps(body).lower()
+
+
+def test_mission_12_connectivity_evidence(client, create_camera):
+    camera = create_camera()["id"]
+    body = client.get(f"/v1/cameras/{camera}/connectivity-evidence").json()
+    assert body["camera_id"] == camera
+    assert body["status"] in {"unknown", "online", "offline", "auth_failed", "error"}
+    assert body["recent_event_count"] >= 0
+
+
+def test_mission_13_stream_quality_is_read_only(client, create_camera):
+    camera = create_camera()["id"]
+    body = client.get(f"/v1/cameras/{camera}/stream-quality").json()
+    assert body["camera_id"] == camera
+    assert body["status"] in {"known", "unknown"}
+    assert "path" not in body and "url" not in body
+
+
+def test_mission_14_maintenance_metadata_is_idempotent(client, create_camera):
+    camera = create_camera()["id"]
+    path = f"/v1/internal/cameras/{camera}/maintenance"
+    payload = {"command_ref": "maint-1", "enabled": True, "reason_ref": "planned"}
+    first = client.post(path, json=payload)
+    assert first.status_code == 200
+    second = client.post(path, json=payload)
+    assert second.status_code == 200 and second.json() == first.json()
+    assert client.get(f"/v1/cameras/{camera}/maintenance").json()["enabled"] is True
+
+
+def test_mission_15_inventory_search_is_tenant_scoped(client, create_camera):
+    camera = create_camera(labels={"site": "hq", "zone": "north"})["id"]
+    body = client.get("/v1/camera-inventory/search?label_key=site&label_value=hq").json()
+    assert camera in body["items"] and body["total"] >= 1
+    other = client.get(
+        "/v1/camera-inventory/search?label_key=site&label_value=hq",
+        headers={"X-Tenant-ID": "other"},
+    ).json()
+    assert camera not in other["items"]
+
+
+def test_mission_16_compatibility_is_explicit(client, create_camera):
+    camera = create_camera()["id"]
+    body = client.get(f"/v1/cameras/{camera}/compatibility").json()
+    assert body["camera_id"] == camera
+    assert body["checks"]["middleware_authority"] is True
+    assert "compatible" in body
+
+
+def test_mission_17_event_cursor_page(client, create_camera):
+    camera_id = create_camera()["id"]
+    camera = client.app.state.store.get("tenant-a", camera_id)
+    client.app.state.service.missions.signal(camera, "online")
+    page = client.get(f"/v1/cameras/{camera_id}/events/page?limit=1&offset=0")
+    assert page.status_code == 200
+    body = page.json()
+    assert body["limit"] == 1 and body["offset"] == 0
+    assert len(body["items"]) == 1
+
+
+def test_mission_18_health_slo(client, create_camera):
+    camera = create_camera()["id"]
+    body = client.get(f"/v1/cameras/{camera}/health/slo").json()
+    assert body["camera_id"] == camera
+    assert body["status"] in {"healthy", "degraded", "unknown"}
+
+
+def test_mission_19_secret_reference_health_redacts_reference(client):
+    camera = register(client)
+    body = client.get(f"/v1/cameras/{camera}/credentials/reference-health").json()
+    assert body["configured"] is True
+    assert body["scheme"] == "openbao"
+    assert body["fingerprint"]
+    assert "openbao://" not in json.dumps(body)
+    assert "password" not in json.dumps(body).lower()
+
+
+def test_mission_20_retention_policy_readback(client, create_camera):
+    camera = create_camera()["id"]
+    body = client.get(f"/v1/cameras/{camera}/retention-policy").json()
+    assert body["raw_frames_persisted"] is False
+    assert body["clip_retention_s"] > 0
+    assert body["normalized_event_limit"] > 0
+
+
+def test_mission_21_diagnostics_are_sanitized(client, create_camera):
+    camera = create_camera()["id"]
+    response = client.get(f"/v1/cameras/{camera}/diagnostics")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["camera_id"] == camera
+    assert body["secrets_exposed"] is False
+    serialized = json.dumps(body).lower()
+    assert "password" not in serialized and "openbao://" not in serialized
+
+
+def test_mission_22_contract_version_is_stable(client):
+    response = client.get("/v1/contract-version")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["api_version"] == "v1"
+    assert body["contract_revision"] == "camera-gateway.missions-11-22.v1"
+    assert len(body["capability_sha256"]) == 64
+    assert body["middleware_authority"] is True

@@ -203,3 +203,117 @@ class ClockDriftHealth(BaseModel):
     stale: bool = False
     source: Literal["onvif-get-system-date-time"] = "onvif-get-system-date-time"
     mutation_performed: Literal[False] = False
+
+
+class ConfigurationSnapshot(BaseModel):
+    camera_id: str
+    observed_at: datetime
+    config_sha256: str
+    enabled: bool
+    vendor: str
+    rtsp_transport: str
+    onvif_enabled: bool
+    credential_ref_present: bool
+    labels_count: int
+
+
+class ConnectivityEvidence(BaseModel):
+    camera_id: str
+    observed_at: datetime
+    status: str
+    last_success_at: datetime | None = None
+    last_error_code: str | None = None
+    recent_event_count: int
+
+
+class StreamQualityStatus(BaseModel):
+    camera_id: str
+    observed_at: datetime
+    status: Literal["known", "unknown"]
+    codec: str | None = None
+    width: int | None = None
+    height: int | None = None
+    fps: float | None = None
+    last_frame_at: datetime | None = None
+    stale: bool
+
+
+class MaintenanceState(BaseModel):
+    camera_id: str
+    enabled: bool
+    reason_ref: str | None = None
+    changed_at: datetime | None = None
+
+
+class MaintenanceUpdate(Strict):
+    command_ref: Reference
+    enabled: bool
+    reason_ref: Reference | None = None
+
+
+class CameraSearchResult(BaseModel):
+    items: list[str]
+    total: int
+
+
+class CompatibilityStatus(BaseModel):
+    camera_id: str
+    compatible: bool
+    checks: dict[str, bool]
+    warnings: list[str] = Field(default_factory=list)
+
+
+class EventCursorPage(BaseModel):
+    items: list[NormalizedCameraEvent]
+    next_offset: int | None = None
+    limit: int
+    offset: int
+
+
+class HealthSloStatus(BaseModel):
+    camera_id: str
+    observed_at: datetime
+    health_fresh: bool
+    frame_fresh: bool
+    last_success_at: datetime | None = None
+    last_frame_at: datetime | None = None
+    status: Literal["healthy", "degraded", "unknown"]
+
+
+class SecretReferenceHealth(BaseModel):
+    camera_id: str
+    configured: bool
+    scheme: Literal["openbao"] | None = None
+    fingerprint: str | None = None
+    reference_valid: bool
+    last_successful_auth: datetime | None = None
+
+
+class RetentionPolicyStatus(BaseModel):
+    camera_id: str
+    clip_retention_s: int
+    rolling_buffer_retention_s: int
+    health_event_limit: int
+    normalized_event_limit: int
+    raw_frames_persisted: Literal[False] = False
+
+
+class DiagnosticsSnapshot(BaseModel):
+    camera_id: str
+    observed_at: datetime
+    health_status: str
+    inventory_stale: bool
+    credentials_configured: bool
+    rolling_buffer_enabled: bool
+    maintenance_enabled: bool
+    clock_drift_ms: int | None = None
+    secrets_exposed: Literal[False] = False
+
+
+class ContractVersionStatus(BaseModel):
+    service: str
+    service_version: str
+    api_version: Literal["v1"] = "v1"
+    contract_revision: Literal["camera-gateway.missions-11-22.v1"] = "camera-gateway.missions-11-22.v1"
+    capability_sha256: str
+    middleware_authority: Literal[True] = True

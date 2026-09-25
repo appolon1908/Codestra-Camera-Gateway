@@ -3524,6 +3524,1189 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/configuration-snapshot:
+    get:
+      tags:
+      - operations
+      summary: Configuration Snapshot
+      operationId: configuration_snapshot_v1_cameras__camera_id__configuration_snapshot_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfigurationSnapshot'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/connectivity-evidence:
+    get:
+      tags:
+      - health
+      summary: Connectivity Evidence
+      operationId: connectivity_evidence_v1_cameras__camera_id__connectivity_evidence_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectivityEvidence'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/stream-quality:
+    get:
+      tags:
+      - health
+      summary: Stream Quality
+      operationId: stream_quality_v1_cameras__camera_id__stream_quality_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamQualityStatus'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/maintenance:
+    get:
+      tags:
+      - operations
+      summary: Maintenance State
+      operationId: maintenance_state_v1_cameras__camera_id__maintenance_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceState'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/internal/cameras/{camera_id}/maintenance:
+    post:
+      tags:
+      - private-effects
+      summary: Update Maintenance
+      operationId: update_maintenance_v1_internal_cameras__camera_id__maintenance_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MaintenanceUpdate'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceState'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/camera-inventory/search:
+    get:
+      tags:
+      - cameras
+      summary: Search Cameras
+      operationId: search_cameras_v1_camera_inventory_search_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: label_key
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label Key
+      - name: label_value
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Label Value
+      - name: vendor
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Vendor
+      - name: enabled
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: boolean
+          - type: 'null'
+          title: Enabled
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CameraSearchResult'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/compatibility:
+    get:
+      tags:
+      - operations
+      summary: Compatibility
+      operationId: compatibility_v1_cameras__camera_id__compatibility_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompatibilityStatus'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/events/page:
+    get:
+      tags:
+      - events
+      summary: Event Cursor
+      operationId: event_cursor_v1_cameras__camera_id__events_page_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 200
+          minimum: 1
+          default: 50
+          title: Limit
+      - name: offset
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+          title: Offset
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventCursorPage'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/health/slo:
+    get:
+      tags:
+      - health
+      summary: Health Slo
+      operationId: health_slo_v1_cameras__camera_id__health_slo_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthSloStatus'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/credentials/reference-health:
+    get:
+      tags:
+      - credentials
+      summary: Secret Reference Health
+      operationId: secret_reference_health_v1_cameras__camera_id__credentials_reference_health_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecretReferenceHealth'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/retention-policy:
+    get:
+      tags:
+      - operations
+      summary: Retention Policy
+      operationId: retention_policy_v1_cameras__camera_id__retention_policy_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionPolicyStatus'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/cameras/{camera_id}/diagnostics:
+    get:
+      tags:
+      - operations
+      summary: Diagnostics
+      operationId: diagnostics_v1_cameras__camera_id__diagnostics_get
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: camera_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^cam_[a-f0-9]{32}$
+          description: Gateway camera ID
+          title: Camera Id
+        description: Gateway camera ID
+      - name: X-Tenant-ID
+        in: header
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+          title: X-Tenant-Id
+        description: Tenant scope asserted by Middleware V3. Cross-tenant access returns 404.
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagnosticsSnapshot'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /v1/contract-version:
+    get:
+      tags:
+      - operations
+      summary: Contract Version
+      operationId: contract_version_v1_contract_version_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContractVersionStatus'
+        '401':
+          description: Missing or invalid service token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Feature disabled by configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Camera not found for this tenant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Conflict (duplicate camera_ref or camera disabled)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many concurrent camera operations
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Camera unreachable, auth failure, stream not found or invalid protocol response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Camera credential reference could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: Camera timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+      security:
+      - HTTPBearer: []
 components:
   schemas:
     Camera:
@@ -3730,6 +4913,21 @@ components:
       - limit
       - offset
       title: CameraList
+    CameraSearchResult:
+      properties:
+        items:
+          items:
+            type: string
+          type: array
+          title: Items
+        total:
+          type: integer
+          title: Total
+      type: object
+      required:
+      - items
+      - total
+      title: CameraSearchResult
     CameraUpdate:
       properties:
         name:
@@ -3953,6 +5151,137 @@ components:
       required:
       - command_ref
       title: CommandResult
+    CompatibilityStatus:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        compatible:
+          type: boolean
+          title: Compatible
+        checks:
+          additionalProperties:
+            type: boolean
+          type: object
+          title: Checks
+        warnings:
+          items:
+            type: string
+          type: array
+          title: Warnings
+      type: object
+      required:
+      - camera_id
+      - compatible
+      - checks
+      title: CompatibilityStatus
+    ConfigurationSnapshot:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+        config_sha256:
+          type: string
+          title: Config Sha256
+        enabled:
+          type: boolean
+          title: Enabled
+        vendor:
+          type: string
+          title: Vendor
+        rtsp_transport:
+          type: string
+          title: Rtsp Transport
+        onvif_enabled:
+          type: boolean
+          title: Onvif Enabled
+        credential_ref_present:
+          type: boolean
+          title: Credential Ref Present
+        labels_count:
+          type: integer
+          title: Labels Count
+      type: object
+      required:
+      - camera_id
+      - observed_at
+      - config_sha256
+      - enabled
+      - vendor
+      - rtsp_transport
+      - onvif_enabled
+      - credential_ref_present
+      - labels_count
+      title: ConfigurationSnapshot
+    ConnectivityEvidence:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+        status:
+          type: string
+          title: Status
+        last_success_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Success At
+        last_error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Error Code
+        recent_event_count:
+          type: integer
+          title: Recent Event Count
+      type: object
+      required:
+      - camera_id
+      - observed_at
+      - status
+      - recent_event_count
+      title: ConnectivityEvidence
+    ContractVersionStatus:
+      properties:
+        service:
+          type: string
+          title: Service
+        service_version:
+          type: string
+          title: Service Version
+        api_version:
+          type: string
+          const: v1
+          title: Api Version
+          default: v1
+        contract_revision:
+          type: string
+          const: camera-gateway.missions-11-22.v1
+          title: Contract Revision
+          default: camera-gateway.missions-11-22.v1
+        capability_sha256:
+          type: string
+          title: Capability Sha256
+        middleware_authority:
+          type: boolean
+          const: true
+          title: Middleware Authority
+          default: true
+      type: object
+      required:
+      - service
+      - service_version
+      - capability_sha256
+      title: ContractVersionStatus
     Coverage:
       properties:
         zone_ref:
@@ -4170,6 +5499,50 @@ components:
       required:
       - camera_id
       title: DeviceInventory
+    DiagnosticsSnapshot:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+        health_status:
+          type: string
+          title: Health Status
+        inventory_stale:
+          type: boolean
+          title: Inventory Stale
+        credentials_configured:
+          type: boolean
+          title: Credentials Configured
+        rolling_buffer_enabled:
+          type: boolean
+          title: Rolling Buffer Enabled
+        maintenance_enabled:
+          type: boolean
+          title: Maintenance Enabled
+        clock_drift_ms:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Clock Drift Ms
+        secrets_exposed:
+          type: boolean
+          const: false
+          title: Secrets Exposed
+          default: false
+      type: object
+      required:
+      - camera_id
+      - observed_at
+      - health_status
+      - inventory_stale
+      - credentials_configured
+      - rolling_buffer_enabled
+      - maintenance_enabled
+      title: DiagnosticsSnapshot
     DiscoveredDevice:
       properties:
         endpoint_reference:
@@ -4244,6 +5617,30 @@ components:
       required:
       - error
       title: ErrorResponse
+    EventCursorPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/NormalizedCameraEvent'
+          type: array
+          title: Items
+        next_offset:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Next Offset
+        limit:
+          type: integer
+          title: Limit
+        offset:
+          type: integer
+          title: Offset
+      type: object
+      required:
+      - items
+      - limit
+      - offset
+      title: EventCursorPage
     Group:
       properties:
         name:
@@ -4332,6 +5729,48 @@ components:
       - observed_at
       - signal
       title: HealthEvent
+    HealthSloStatus:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+        health_fresh:
+          type: boolean
+          title: Health Fresh
+        frame_fresh:
+          type: boolean
+          title: Frame Fresh
+        last_success_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Success At
+        last_frame_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Frame At
+        status:
+          type: string
+          enum:
+          - healthy
+          - degraded
+          - unknown
+          title: Status
+      type: object
+      required:
+      - camera_id
+      - observed_at
+      - health_fresh
+      - frame_fresh
+      - status
+      title: HealthSloStatus
     HealthStatus:
       type: string
       enum:
@@ -4341,6 +5780,51 @@ components:
       - auth_failed
       - error
       title: HealthStatus
+    MaintenanceState:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        enabled:
+          type: boolean
+          title: Enabled
+        reason_ref:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Reason Ref
+        changed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Changed At
+      type: object
+      required:
+      - camera_id
+      - enabled
+      title: MaintenanceState
+    MaintenanceUpdate:
+      properties:
+        command_ref:
+          type: string
+          pattern: ^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$
+          title: Command Ref
+        enabled:
+          type: boolean
+          title: Enabled
+        reason_ref:
+          anyOf:
+          - type: string
+            pattern: ^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$
+          - type: 'null'
+          title: Reason Ref
+      additionalProperties: false
+      type: object
+      required:
+      - command_ref
+      - enabled
+      title: MaintenanceUpdate
     MediaInfo:
       properties:
         codec:
@@ -4777,6 +6261,36 @@ components:
       - name
       - ok
       title: ReadinessCheck
+    RetentionPolicyStatus:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        clip_retention_s:
+          type: integer
+          title: Clip Retention S
+        rolling_buffer_retention_s:
+          type: integer
+          title: Rolling Buffer Retention S
+        health_event_limit:
+          type: integer
+          title: Health Event Limit
+        normalized_event_limit:
+          type: integer
+          title: Normalized Event Limit
+        raw_frames_persisted:
+          type: boolean
+          const: false
+          title: Raw Frames Persisted
+          default: false
+      type: object
+      required:
+      - camera_id
+      - clip_retention_s
+      - rolling_buffer_retention_s
+      - health_event_limit
+      - normalized_event_limit
+      title: RetentionPolicyStatus
     RollingBufferStatus:
       properties:
         camera_id:
@@ -4862,6 +6376,40 @@ components:
       - tcp
       - udp
       title: RtspTransport
+    SecretReferenceHealth:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        configured:
+          type: boolean
+          title: Configured
+        scheme:
+          anyOf:
+          - type: string
+            const: openbao
+          - type: 'null'
+          title: Scheme
+        fingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Fingerprint
+        reference_valid:
+          type: boolean
+          title: Reference Valid
+        last_successful_auth:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Successful Auth
+      type: object
+      required:
+      - camera_id
+      - configured
+      - reference_valid
+      title: SecretReferenceHealth
     StatusSummary:
       properties:
         total:
@@ -4883,6 +6431,57 @@ components:
       - enabled
       - by_status
       title: StatusSummary
+    StreamQualityStatus:
+      properties:
+        camera_id:
+          type: string
+          title: Camera Id
+        observed_at:
+          type: string
+          format: date-time
+          title: Observed At
+        status:
+          type: string
+          enum:
+          - known
+          - unknown
+          title: Status
+        codec:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Codec
+        width:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Width
+        height:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Height
+        fps:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Fps
+        last_frame_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+          title: Last Frame At
+        stale:
+          type: boolean
+          title: Stale
+      type: object
+      required:
+      - camera_id
+      - observed_at
+      - status
+      - stale
+      title: StreamQualityStatus
     StreamTestResult:
       properties:
         ok:

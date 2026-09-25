@@ -53,6 +53,10 @@ CREATE TABLE IF NOT EXISTS normalized_camera_events (
  camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
  observed_at TEXT NOT NULL, body TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS maintenance_state (
+ tenant TEXT NOT NULL, camera_id TEXT NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+ body TEXT NOT NULL, PRIMARY KEY(tenant, camera_id)
+);
 """
 
 
@@ -271,3 +275,21 @@ class MissionStore:
             body = json.loads(row["body"])
             result.append(NormalizedCameraEvent(id=row["id"], camera_id=camera_id, **body))
         return result
+
+    def maintenance_state(self, tenant, camera_id):
+        self.cameras.get(tenant, camera_id)
+        with self.lock:
+            row = self.conn.execute(
+                "SELECT body FROM maintenance_state WHERE tenant=? AND camera_id=?",
+                (tenant, camera_id),
+            ).fetchone()
+        return {} if row is None else json.loads(row["body"])
+
+    def save_maintenance_state(self, tenant, camera_id, body):
+        self.cameras.get(tenant, camera_id)
+        with self.lock:
+            self.conn.execute(
+                "INSERT INTO maintenance_state(tenant,camera_id,body) VALUES(?,?,?) "
+                "ON CONFLICT(tenant,camera_id) DO UPDATE SET body=excluded.body",
+                (tenant, camera_id, json.dumps(body, separators=(",", ":"), sort_keys=True)),
+            )
