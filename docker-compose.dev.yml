@@ -17,6 +17,9 @@ services:
       # Stand-in for files rendered by an OpenBao agent/CSI driver.
       CAMERA_GATEWAY_SECRETS_DIR: /run/openbao
       CAMERA_GATEWAY_ENABLE_MJPEG_PREVIEW: "true"
+      # Private effects require deliberate operator enablement and Middleware wrapping.
+      CAMERA_GATEWAY_ENABLE_PTZ: "false"
+      CAMERA_GATEWAY_ENABLE_CLIP_CAPTURE: "false"
     volumes:
       - gateway-data:/var/lib/camera-gateway
       - ./dev/secrets/openbao:/run/openbao:ro

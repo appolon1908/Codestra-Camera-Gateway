@@ -30,6 +30,7 @@ from camera_gateway.errors import (
     SecretUnavailable,
 )
 from camera_gateway.metrics import Metrics
+from camera_gateway.missions import Missions
 from camera_gateway.models import (
     Camera,
     CameraHealth,
@@ -88,6 +89,7 @@ class CameraService:
         self._onvif_transport = onvif_transport
         self._media_slots = asyncio.Semaphore(settings.max_concurrent_media_ops)
         self._preview_slots = asyncio.Semaphore(settings.mjpeg_max_sessions)
+        self.missions = Missions(self)
         self.refresh_status_gauge()
 
     # -- helpers -------------------------------------------------------------------
@@ -174,6 +176,7 @@ class CameraService:
 
     def _save_health(self, camera: Camera, health: CameraHealth) -> None:
         self.store.save_health(camera.tenant_id, camera.id, health)
+        self.missions.observe_health(camera, health)
         self.refresh_status_gauge()
 
     # -- ONVIF ---------------------------------------------------------------------
@@ -280,6 +283,7 @@ class CameraService:
             return Snapshot(jpeg=jpeg, width=width, height=height, captured_at=_utcnow())
 
         def update(snap: Snapshot, health: CameraHealth) -> None:
+            self.missions.observe_frame(camera, snap)
             health.last_frame_at = snap.captured_at
             health.media.width = snap.width
             health.media.height = snap.height

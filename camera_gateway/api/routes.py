@@ -113,6 +113,13 @@ def capabilities(request: Request) -> Capabilities:
         secret_ref_schemes=["openbao"],
         features={
             "camera_registry": True,
+            "camera_groups": True,
+            "camera_coverage": True,
+            "ptz_discovery": True,
+            "private_ptz_commands": settings.enable_ptz,
+            "private_clip_capture": settings.enable_clip_capture,
+            "health_history": True,
+            "tamper_heuristics": True,
             "onvif_probe": True,
             "rtsp_snapshot": True,
             "rtsp_stream_test": True,
@@ -121,6 +128,12 @@ def capabilities(request: Request) -> Capabilities:
             "middleware_command_adapter": False,
         },
         limits={
+            "clip_max_duration_s": settings.clip_max_duration_s,
+            "clip_max_bytes": settings.clip_max_bytes,
+            "clip_retention_s": settings.clip_retention_s,
+            "clip_max_files": settings.clip_max_files,
+            "ptz_max_motion_window_s": 5,
+            "frame_stale_s": settings.frame_stale_s,
             "onvif_timeout_s": settings.onvif_timeout_s,
             "rtsp_timeout_s": settings.rtsp_timeout_s,
             "max_concurrent_media_ops": settings.max_concurrent_media_ops,
@@ -192,6 +205,7 @@ def update_camera(camera_id: CameraId, body: CameraUpdate, tenant: Tenant, servi
 )
 def delete_camera(camera_id: CameraId, tenant: Tenant, service: Service) -> Response:
     service.store.delete(tenant, camera_id)
+    service.missions.cleanup()
     service.refresh_status_gauge()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

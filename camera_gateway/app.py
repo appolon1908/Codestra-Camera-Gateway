@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import logging
 import re
 import time
@@ -89,8 +91,15 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         log.info("service starting", extra={"version": __version__, "env": settings.env.value})
-        yield
-        store.close()
+        service.missions.maintenance()
+        maintenance = asyncio.create_task(service.missions.maintain())
+        try:
+            yield
+        finally:
+            maintenance.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await maintenance
+            store.close()
         log.info("service stopped")
 
     app = FastAPI(
@@ -165,6 +174,9 @@ def create_app(
 
     app.include_router(ops)
     app.include_router(v1)
+    from camera_gateway.api.missions import router
+
+    app.include_router(router)
     return app
 
 

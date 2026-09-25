@@ -26,15 +26,17 @@ class ProcessRunner(Protocol):
     def available(self, binary: str) -> bool: ...
 
 
-async def _read_capped(stream: asyncio.StreamReader, cap: int) -> tuple[bytes, bool]:
+async def _read_capped(stream: asyncio.StreamReader, cap: int, *, fail_on_overflow: bool) -> bytes:
     buf = bytearray()
     while True:
         chunk = await stream.read(65536)
         if not chunk:
-            return bytes(buf), False
-        if len(buf) + len(chunk) > cap:
-            return bytes(buf), True
-        buf.extend(chunk)
+            return bytes(buf)
+        remaining = cap - len(buf)
+        if len(chunk) > remaining and fail_on_overflow:
+            raise CameraProtocolError("Camera output exceeded the configured size limit")
+        buf.extend(chunk[:remaining])
+        # Stderr is drained after truncation so a verbose child cannot block on its pipe.
 
 
 async def terminate(proc: asyncio.subprocess.Process) -> None:
@@ -54,18 +56,21 @@ class AsyncProcessRunner:
             stderr=asyncio.subprocess.PIPE,
         )
         assert proc.stdout is not None and proc.stderr is not None
+        readers = [
+            asyncio.create_task(_read_capped(proc.stdout, max_stdout, fail_on_overflow=True)),
+            asyncio.create_task(_read_capped(proc.stderr, _STDERR_CAP, fail_on_overflow=False)),
+        ]
         try:
             async with asyncio.timeout(timeout_s):
-                (stdout, overflow), (stderr, _) = await asyncio.gather(
-                    _read_capped(proc.stdout, max_stdout), _read_capped(proc.stderr, _STDERR_CAP)
-                )
-                if overflow:
-                    raise CameraProtocolError("Camera output exceeded the configured size limit")
+                stdout, stderr = await asyncio.gather(*readers)
                 returncode = await proc.wait()
         except TimeoutError:
             raise CameraTimeout() from None
         finally:
             await terminate(proc)
+            for reader in readers:
+                reader.cancel()
+            await asyncio.gather(*readers, return_exceptions=True)
         return ProcessResult(returncode, stdout, stderr.decode("utf-8", "replace"))
 
     def available(self, binary: str) -> bool:

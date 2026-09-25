@@ -45,6 +45,12 @@ class Metrics:
             ["outcome"],
             registry=self.registry,
         )
+        self.health_signals = Counter(
+            "camera_gateway_health_signals_total",
+            "Observed health and heuristic signals",
+            ["signal"],
+            registry=self.registry,
+        )
         self.preview_sessions = Gauge(
             "camera_gateway_mjpeg_preview_sessions",
             "Active operator MJPEG preview sessions",

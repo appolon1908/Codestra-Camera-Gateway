@@ -286,6 +286,11 @@ class OnvifClient:
             result.append(
                 OnvifProfile(
                     token=token[:128],
+                    ptz_configuration_token=(
+                        find(prof, "PTZConfiguration").get("token")
+                        if find(prof, "PTZConfiguration") is not None
+                        else None
+                    ),
                     name=text(prof, "Name"),
                     video_encoding=encoding,
                     width=_int(text(venc, "Resolution", "Width")) if venc is not None else None,
@@ -317,3 +322,89 @@ class OnvifClient:
             raise CameraProtocolError("Device returned a non-RTSP stream URI")
         path = parts.path + (f"?{parts.query}" if parts.query else "")
         return path, (parts.hostname or "").lower() != self._host.lower()
+
+    async def ptz_discover(self):
+        """Only advertise absolute moves in the standard normalized coordinate spaces."""
+        from camera_gateway.mission_models import PtzCapability
+
+        ns = "http://www.onvif.org/ver20/ptz/wsdl"
+        body = await self._call(
+            self._device_path,
+            f"{NS_DEVICE}/GetCapabilities",
+            "<tds:GetCapabilities><tds:Category>PTZ</tds:Category></tds:GetCapabilities>",
+        )
+        xaddr = text(body, "Capabilities", "PTZ", "XAddr")
+        if not xaddr:
+            return PtzCapability(), None
+        path = self._local_path(xaddr, self._device_path)
+        profiles = await self.profiles(await self.media_service_path())
+        profile = next((p for p in profiles if p.ptz_configuration_token), None)
+        if profile is None:
+            return PtzCapability(), None
+        opts = await self._call(
+            path,
+            f"{ns}/GetConfigurationOptions",
+            f'<p:GetConfigurationOptions xmlns:p="{ns}"><p:ConfigurationToken>'
+            f"{escape(profile.ptz_configuration_token)}</p:ConfigurationToken></p:GetConfigurationOptions>",
+        )
+
+        def normalized(kind, uri, bounds):
+            for node in opts.iter():
+                if _local(node.tag) != kind or text(node, "URI") != uri:
+                    continue
+                if all(
+                    _float(text(node, axis, "Min")) == lo and _float(text(node, axis, "Max")) == hi
+                    for axis, lo, hi in bounds
+                ):
+                    return True
+            return False
+
+        base = "http://www.onvif.org/ver10/tptz/"
+        presets = await self._call(
+            path,
+            f"{ns}/GetPresets",
+            f'<p:GetPresets xmlns:p="{ns}">'
+            f"<p:ProfileToken>{escape(profile.token)}</p:ProfileToken></p:GetPresets>",
+        )
+        import re
+
+        tokens = [n.get("token") for n in presets.iter() if _local(n.tag) == "Preset"]
+        return PtzCapability(
+            supported=True,
+            profile_token=profile.token,
+            absolute_pan_tilt=normalized(
+                "AbsolutePanTiltPositionSpace",
+                base + "PanTiltSpaces/PositionGenericSpace",
+                [("XRange", -1, 1), ("YRange", -1, 1)],
+            ),
+            absolute_zoom=normalized(
+                "AbsoluteZoomPositionSpace", base + "ZoomSpaces/PositionGenericSpace", [("XRange", 0, 1)]
+            ),
+            presets=[t for t in tokens if t and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,127}", t)][:256],
+        ), path
+
+    async def ptz_action(self, path, profile, command):
+        ns = "http://www.onvif.org/ver20/ptz/wsdl"
+        base = "http://www.onvif.org/ver10/tptz/"
+        if command.action == "stop":
+            action, extra = "Stop", "<p:PanTilt>true</p:PanTilt><p:Zoom>true</p:Zoom>"
+        elif command.action == "preset":
+            action, extra = "GotoPreset", f"<p:PresetToken>{escape(command.preset)}</p:PresetToken>"
+        else:
+            action, extra = "AbsoluteMove", "<p:Position>"
+            if command.pan is not None:
+                extra += (
+                    f'<tt:PanTilt x="{command.pan}" y="{command.tilt}" '
+                    f'space="{base}PanTiltSpaces/PositionGenericSpace"/>'
+                )
+            if command.zoom is not None:
+                extra += f'<tt:Zoom x="{command.zoom}" space="{base}ZoomSpaces/PositionGenericSpace"/>'
+            extra += "</p:Position>"
+        response = await self._call(
+            path,
+            f"{ns}/{action}",
+            f'<p:{action} xmlns:p="{ns}">'
+            f"<p:ProfileToken>{escape(profile)}</p:ProfileToken>{extra}</p:{action}>",
+        )
+        if find(response, action + "Response") is None:
+            raise CameraProtocolError("PTZ acknowledgement missing")

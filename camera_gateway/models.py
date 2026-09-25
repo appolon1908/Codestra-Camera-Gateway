@@ -203,6 +203,7 @@ class OnvifDeviceInfo(BaseModel):
 
 
 class OnvifProfile(BaseModel):
+    ptz_configuration_token: str | None = None
     token: str
     name: str | None = None
     video_encoding: str | None = None

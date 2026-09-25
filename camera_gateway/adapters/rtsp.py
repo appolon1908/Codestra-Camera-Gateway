@@ -236,3 +236,35 @@ class RtspClient:
             return
         finally:
             await terminate(proc)
+
+    async def clip(self, target: RtspTarget, duration_s: int, max_bytes: int) -> bytes:
+        """Capture from now; pipe output is capped and the process is always reaped."""
+        argv = [
+            self._ffmpeg,
+            "-hide_banner",
+            "-nostdin",
+            "-loglevel",
+            "warning",
+            *self._input_args(target),
+            "-map",
+            "0:v:0",
+            "-an",
+            "-t",
+            str(duration_s),
+            "-c:v",
+            "copy",
+            "-f",
+            "mpegts",
+            "pipe:1",
+        ]
+        result = await self._runner.run(argv, duration_s + self._timeout_s + 5, max_bytes)
+        if result.returncode != 0:
+            raise classify_ffmpeg_error(target.redacted(result.stderr))
+        if not result.stdout or len(result.stdout) > max_bytes:
+            raise CameraProtocolError("Clip empty or exceeded byte limit")
+        # MPEG-TS consists of 188-byte packets with a sync byte at each boundary.
+        if len(result.stdout) % 188 or any(
+            result.stdout[i] != 0x47 for i in range(0, len(result.stdout), 188)
+        ):
+            raise CameraProtocolError("Clip is not MPEG-TS")
+        return result.stdout

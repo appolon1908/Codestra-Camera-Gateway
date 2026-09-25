@@ -55,6 +55,14 @@ class Settings(BaseSettings):
     mjpeg_fps: int = Field(default=5, ge=1, le=15)
     mjpeg_max_width: int = Field(default=640, ge=160, le=1920)
 
+    enable_ptz: bool = False
+    enable_clip_capture: bool = False
+    clip_max_duration_s: int = Field(default=30, ge=1, le=30)
+    clip_max_bytes: int = Field(default=32 * 1024 * 1024, ge=1024, le=32 * 1024 * 1024)
+    clip_retention_s: int = Field(default=3600, ge=60, le=86400)
+    clip_max_files: int = Field(default=100, ge=1, le=1000)
+    frame_stale_s: int = Field(default=60, ge=1, le=86400)
+
     enable_ws_discovery: bool = False
     ws_discovery_timeout_s: float = Field(default=3.0, gt=0, le=15)
 

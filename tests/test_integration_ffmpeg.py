@@ -91,14 +91,17 @@ async def _run(handler: Handler | None, op: str, timeout_s: float = 2) -> Gatewa
     )
     try:
         with pytest.raises(GatewayError) as info:
-            await (client.probe(target) if op == "probe" else client.snapshot(target))
+            if op == "clip":
+                await client.clip(target, duration_s=1, max_bytes=1024 * 1024)
+            else:
+                await (client.probe(target) if op == "probe" else client.snapshot(target))
         return info.value
     finally:
         if server is not None:
             server.close()
 
 
-@pytest.mark.parametrize("op", ["probe", "snapshot"])
+@pytest.mark.parametrize("op", ["probe", "snapshot", "clip"])
 @pytest.mark.parametrize(
     ("handler", "code"),
     [
