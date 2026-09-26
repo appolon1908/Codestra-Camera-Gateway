@@ -48,7 +48,7 @@ async def unauthorized(reader: asyncio.StreamReader, writer: asyncio.StreamWrite
                 writer.write(f"RTSP/1.0 200 OK\r\nCSeq: {cseq}\r\nPublic: DESCRIBE\r\n\r\n".encode())
             else:
                 response = (
-                    f'RTSP/1.0 401 Unauthorized\r\nCSeq: {cseq}\r\n'
+                    f"RTSP/1.0 401 Unauthorized\r\nCSeq: {cseq}\r\n"
                     'WWW-Authenticate: Basic realm="cam"\r\n\r\n'
                 )
                 writer.write(response.encode())

@@ -327,11 +327,12 @@ class Missions:
             except CameraNotFound:
                 continue  # Concurrent registry deletion is harmless.
 
-
     def buffer_status(self, tenant, camera_id):
         totals = self.store.rolling_totals(tenant, camera_id)
+
         def parse(value):
             return datetime.fromisoformat(value) if value else None
+
         return RollingBufferStatus(
             camera_id=camera_id,
             enabled=self.service.settings.enable_rolling_buffer,
@@ -418,9 +419,7 @@ class Missions:
         fingerprint = hashlib.sha256(str(ref).encode()).hexdigest()[:16] if ref else None
         last = camera.health.last_success_at
         next_due = (
-            last + timedelta(seconds=self.service.settings.credential_rotation_interval_s)
-            if last
-            else None
+            last + timedelta(seconds=self.service.settings.credential_rotation_interval_s) if last else None
         )
         return CredentialRotationStatus(
             camera_id=camera_id,
@@ -460,7 +459,6 @@ class Missions:
             drift_ms=None if offset is None else int(offset * 1000),
             stale=False,
         )
-
 
     def configuration_snapshot(self, tenant, camera_id):
         camera = self.service.store.get(tenant, camera_id)
@@ -572,7 +570,8 @@ class Missions:
         checks = {
             "host_valid": bool(camera.host),
             "stream_resolvable": bool(camera.rtsp.path or camera.onvif.enabled),
-            "credential_reference_only": camera.credentials is None or str(camera.credentials.password_ref).startswith("openbao://"),
+            "credential_reference_only": camera.credentials is None
+            or str(camera.credentials.password_ref).startswith("openbao://"),
             "middleware_authority": True,
         }
         warnings = []

@@ -176,6 +176,7 @@ def health_history(camera_id: CameraId, tenant: Tenant, service: Service, limit:
     service.missions.check_stale(camera)
     return service.missions.store.history(tenant, camera_id, limit)
 
+
 @router.get("/cameras/{camera_id}/buffer", response_model=RollingBufferStatus, tags=["buffer"])
 def rolling_buffer_status(camera_id: CameraId, tenant: Tenant, service: Service):
     """Read-only bounded rolling-buffer metadata. No filenames or media bytes are exposed."""
@@ -246,6 +247,7 @@ async def credential_reload(
 async def clock_drift(camera_id: CameraId, tenant: Tenant, service: Service):
     """Measure device timestamp drift. This endpoint never mutates the camera clock."""
     return await service.missions.clock_drift(tenant, camera_id)
+
 
 @router.get(
     "/cameras/{camera_id}/configuration-snapshot",
