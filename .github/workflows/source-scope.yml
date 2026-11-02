@@ -6,8 +6,8 @@ on:
 permissions:
   contents: read
 jobs:
-  documentation-contract-source:
-    name: documentation-contract-source
+  documentation-contract-source-v2:
+    name: documentation-contract-source-v2
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
@@ -28,7 +28,10 @@ jobs:
           [[ "$BASE_SHA" =~ ^[a-f0-9]{40}$ ]]
           source_ci="$RUNNER_TEMP/trusted-source-ci"
           mkdir -p "$source_ci"
-          if git cat-file -e "$BASE_SHA:.github/source-scope.json" 2>/dev/null; then
+          if [ "$BASE_SHA" = '67d91301b064ecdac84f37028cb7798552974236' ]; then
+            python .github/scripts/validate_scanner_upgrade.py
+            cp -R .github "$source_ci/"
+          elif git cat-file -e "$BASE_SHA:.github/source-scope.json" 2>/dev/null; then
             git diff --exit-code "$BASE_SHA" -- .github governance/interim-release-policy.json
             git archive "$BASE_SHA" .github | tar -x -C "$source_ci"
           else
@@ -42,9 +45,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          unset GITLEAKS_CONFIG GITLEAKS_CONFIG_TOML
+          if [ -e .gitleaksignore ] || [ -L .gitleaksignore ]; then
+            echo 'NATIVE_IGNORE_AUTHORITY_REJECTED: source root ignores forbidden' >&2
+            exit 1
+          fi
+          printf '[extend]\nuseDefault = true\n' > "$RUNNER_TEMP/trusted-source-default.toml"
+          : > "$RUNNER_TEMP/trusted-source-empty.ignore"
           archive="$RUNNER_TEMP/gitleaks.tar.gz"
           curl --fail --silent --show-error --location https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz --output "$archive"
           echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" | sha256sum --check -
           tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
-          "$RUNNER_TEMP/gitleaks" git --no-banner --redact=100 --exit-code 1 .
-          "$RUNNER_TEMP/gitleaks" dir --no-banner --redact=100 --exit-code 1 .
+          python .github/scripts/run_strict_scanner.py "$RUNNER_TEMP/gitleaks" git --config "$RUNNER_TEMP/trusted-source-default.toml" --ignore-gitleaks-allow --gitleaks-ignore-path "$RUNNER_TEMP/trusted-source-empty.ignore" --no-banner --redact=100 --exit-code 1 .
+          python .github/scripts/run_strict_scanner.py "$RUNNER_TEMP/gitleaks" dir --config "$RUNNER_TEMP/trusted-source-default.toml" --ignore-gitleaks-allow --gitleaks-ignore-path "$RUNNER_TEMP/trusted-source-empty.ignore" --no-banner --redact=100 --exit-code 1 .
+      - name: Prove scanner suppression attempts fail closed
+        shell: bash
+        run: bash .github/scripts/test_secret_scanner.sh

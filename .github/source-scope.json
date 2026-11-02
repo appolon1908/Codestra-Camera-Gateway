@@ -80,7 +80,7 @@
       "authorization_date": "2026-11-02",
       "required_checks": [
         {
-          "context": "documentation-contract-source",
+          "context": "documentation-contract-source-v2",
           "integration_id": 15368,
           "workflow": ".github/workflows/source-scope.yml"
         }
