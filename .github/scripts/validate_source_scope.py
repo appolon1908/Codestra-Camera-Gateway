@@ -13,6 +13,12 @@ import yaml
 from markdown_it import MarkdownIt
 
 CI_FILES = {
+    '.github/scripts/classify_scanner_metadata.py',
+    '.github/scripts/scanner_metadata_receipts.json',
+    '.github/scripts/run_strict_scanner.py',
+    '.github/scripts/test_classify_scanner_metadata.py',
+    '.github/scripts/test_runner.py',
+
     '.github/scripts/validate_scanner_upgrade.py',
     '.github/scripts/test_secret_scanner.sh',
     '.github/workflows/source-scope.yml',
