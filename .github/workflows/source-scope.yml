@@ -1,0 +1,50 @@
+name: Documentation and contract source scope
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  documentation-contract-source:
+    name: documentation-contract-source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      BOOTSTRAP_BASE_SHA: 0c20b2782aeac11a7f7cf24cf0115f85e6e28ce8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.12'
+      - name: Validate documentation, contract semantics and fail-closed source scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          source_ci="$RUNNER_TEMP/trusted-source-ci"
+          mkdir -p "$source_ci"
+          if git cat-file -e "$BASE_SHA:.github/source-scope.json" 2>/dev/null; then
+            git diff --exit-code "$BASE_SHA" -- .github governance/interim-release-policy.json
+            git archive "$BASE_SHA" .github | tar -x -C "$source_ci"
+          else
+            test "$BASE_SHA" = "$BOOTSTRAP_BASE_SHA"
+            cp -R .github "$source_ci/"
+          fi
+          python -m pip install --disable-pip-version-check --no-cache-dir -r "$source_ci/.github/requirements-source-scope.txt"
+          python -m unittest discover -s "$source_ci/.github/scripts" -p 'test_*.py'
+          python "$source_ci/.github/scripts/validate_source_scope.py"
+      - name: Scan complete effective tree and tracked history for secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/gitleaks.tar.gz"
+          curl --fail --silent --show-error --location https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz --output "$archive"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $archive" | sha256sum --check -
+          tar -xzf "$archive" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git --no-banner --redact=100 --exit-code 1 .
+          "$RUNNER_TEMP/gitleaks" dir --no-banner --redact=100 --exit-code 1 .
