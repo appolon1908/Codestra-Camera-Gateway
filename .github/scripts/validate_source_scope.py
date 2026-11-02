@@ -1,6 +1,7 @@
 """Documentation/contract validation only. Application source is denied by default."""
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -93,8 +94,12 @@ def markdown_info(text):
     return links, anchors
 
 
-def validate(root, tracked, manifest):
+def validate(root, tracked, manifest, trusted_manifest=None):
     errors, texts, markdown = [], {}, {}
+    if trusted_manifest is not None:
+        if json.dumps(manifest, sort_keys=True) != json.dumps(trusted_manifest, sort_keys=True):
+            errors.append('Candidate scope manifest differs from trusted Git base; authority review required')
+        manifest = trusted_manifest
     root = root.resolve()
     allowed_structured = manifest.get('structured_files', {})
     for name, mode in tracked.items():
@@ -150,11 +155,72 @@ def validate(root, tracked, manifest):
             relative = target.relative_to(root).as_posix()
             exists = relative in tracked or any(p.startswith(relative.rstrip('/') + '/') for p in tracked)
             if not exists:
-                errors.append(f'Broken internal link in {name}: {link}')
+                errors.append(f'Broken internal link in {name}')
             elif parsed.fragment and relative.endswith('.md'):
                 if unquote(parsed.fragment) not in markdown.get(relative, ([], set()))[1]:
-                    errors.append(f'Broken heading link in {name}: {link}')
+                    errors.append(f'Broken heading link in {name}')
     return errors
+
+
+def source_policy(repository):
+    return {
+        'schema_version': 1, 'policy_kind': 'source_merge', 'repository': repository,
+        'authorization_date': '2026-11-02',
+        'required_checks': [{'context': 'documentation-contract-source', 'integration_id': 15368,
+                             'workflow': '.github/workflows/source-scope.yml'}],
+        'replaces_contexts': ['codestra-control-plane', 'codestra/control-plane'],
+        'preserve': ['other_required_checks', 'review_requirements', 'ref_conditions',
+                     'bypass_actors', 'enforcement', 'force_push_protection',
+                     'deletion_protection', 'deployment_authority'],
+        'production_activation_authorized': False,
+        'note': 'GitHub rulesets remain the enforcement authority. Documentation/contract-only validation denies application sources until vetted product CI is separately reviewed; it does not certify runtime or authorize deployment.',
+    }
+
+
+def trusted_from_git(base, repository, bootstrap):
+    """Never derive authority from candidate-supplied expected values."""
+    if not re.fullmatch('[a-f0-9]{40}', base):
+        raise ValueError('Missing/invalid trusted event base SHA')
+    existing = subprocess.run(['git', 'show', f'{base}:.github/source-scope.json'],
+                              capture_output=True, check=False)
+    if existing.returncode == 0:
+        # Existing authority is immutable in the ordinary documentation lane.
+        changed = subprocess.check_output(['git', 'diff', '--name-only', base, '--',
+                                           '.github', 'governance/interim-release-policy.json'])
+        if changed.strip():
+            raise ValueError('CI/scope authority changed; independent authority-review lane required')
+        return json.loads(existing.stdout)
+    if base != bootstrap or not re.fullmatch('[a-f0-9]{40}', bootstrap):
+        raise ValueError('Unrecognized bootstrap base; no permissive fallback')
+    raw = subprocess.check_output(['git', 'ls-tree', '-rz', '--full-tree', base]).decode()
+    documents = {}
+    for entry in raw.split('\0'):
+        if not entry:
+            continue
+        metadata, name = entry.split('\t', 1)
+        mode, kind, _ = metadata.split()
+        if mode != '100644' or kind != 'blob':
+            raise ValueError('Bootstrap base has executable/symlink/submodule')
+        if not (name.endswith(('.md', '.json', '.yaml', '.yml')) or name == '.gitignore'):
+            raise ValueError('Bootstrap base is not documentation/contract-only')
+        if name.startswith('.github/'):
+            raise ValueError('Bootstrap base already has unreviewed CI authority')
+        documents[name] = subprocess.check_output(['git', 'show', f'{base}:{name}']).decode().replace('\r\n', '\n')
+    if 'AGENTS.md' not in documents or not documents:
+        raise ValueError('Bootstrap base lacks reviewed repository authority')
+    expected = {
+        'schema_version': 1, 'repository': repository,
+        'scope': 'documentation-contract-only', 'application_source_allowed': False,
+        'baseline_files': sorted(documents),
+        'authority_hashes': {name: hashlib.sha256(text.encode()).hexdigest()
+                             for name, text in documents.items()
+                             if name in ('AGENTS.md', 'ARCHITECTURE.md', '.codestra/MIDDLEWARE-INTEGRATION-CONTRACT.md')},
+        'required_text': {},
+        'structured_files': {name: structured(name, text) for name, text in documents.items()
+                             if name.endswith(('.json', '.yaml', '.yml'))},
+    }
+    expected['structured_files']['governance/interim-release-policy.json'] = source_policy(repository)
+    return expected
 
 
 def main():
@@ -169,7 +235,9 @@ def main():
                 raise SystemExit('Unmerged index rejected')
             tracked[name] = mode
     manifest = json.loads(Path('.github/source-scope.json').read_text())
-    errors = validate(root, tracked, manifest)
+    trusted = trusted_from_git(os.environ.get('BASE_SHA', ''), os.environ['GITHUB_REPOSITORY'],
+                               os.environ.get('BOOTSTRAP_BASE_SHA', ''))
+    errors = validate(root, tracked, manifest, trusted_manifest=trusted)
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         raise SystemExit(1)

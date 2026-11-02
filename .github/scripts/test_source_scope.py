@@ -58,6 +58,21 @@ class SourceScopeTests(unittest.TestCase):
             for mode in ('100755', '120000', '160000'):
                 self.assertTrue(validate(root, {'README.md': mode}, {'structured_files': {}, 'required_text': {}, 'baseline_files': []}))
 
+    def test_candidate_cannot_remove_trusted_manifest_restrictions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'README.md').write_text('# Docs')
+            trusted = {'baseline_files': ['README.md'], 'structured_files': {}, 'authority_hashes': {'README.md': 'fixed'}}
+            self.assertTrue(validate(root, {'README.md': '100644'}, {}, trusted_manifest=trusted))
+
+    def test_candidate_cannot_rewrite_contract_expectation_with_contract(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'known.json').write_text('{"enabled": true}')
+            trusted = {'baseline_files': ['known.json'], 'structured_files': {'known.json': {'enabled': False}}}
+            candidate = {'baseline_files': [], 'structured_files': {'known.json': {'enabled': True}}}
+            self.assertTrue(validate(root, {'known.json': '100644'}, candidate, trusted_manifest=trusted))
+
 
 if __name__ == '__main__':
     unittest.main()
