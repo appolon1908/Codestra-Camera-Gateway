@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "repository": "appolon1908/Codestra-Camera-Gateway",
+  "scope": "documentation-contract-only",
+  "application_source_allowed": false,
+  "baseline_files": [
+    ".gitignore",
+    "AGENTS.md",
+    "ARCHITECTURE.md",
+    "README.md",
+    "docs/ARCHITECTURE-CHARTS.md",
+    "openapi.yaml"
+  ],
+  "authority_hashes": {
+    "AGENTS.md": "9461f1ebfc5bb1cb04de6dbf92445f23c2e2038537bc6b0f1ecc07ee22f69a64",
+    "ARCHITECTURE.md": "debcd87578482015fc7928482e493b9ef691026ca722f4a0410e44df218348e2"
+  },
+  "required_text": {},
+  "structured_files": {
+    "openapi.yaml": {
+      "openapi": "3.1.0",
+      "info": {
+        "title": "Codestra Camera Gateway API",
+        "version": "0.1.0",
+        "description": "Standalone Codestra service. Cross-system access is mediated by Middleware V3."
+      },
+      "servers": [
+        {
+          "url": "http://localhost"
+        }
+      ],
+      "paths": {
+        "/healthz": {
+          "get": {
+            "operationId": "health",
+            "responses": {
+              "200": {
+                "description": "Healthy"
+              }
+            }
+          }
+        },
+        "/readyz": {
+          "get": {
+            "operationId": "ready",
+            "responses": {
+              "200": {
+                "description": "Ready"
+              }
+            }
+          }
+        },
+        "/v1/capabilities": {
+          "get": {
+            "operationId": "capabilities",
+            "responses": {
+              "200": {
+                "description": "Service capabilities"
+              }
+            }
+          }
+        },
+        "/v1/cameras/status": {
+          "get": {
+            "operationId": "serviceStatus",
+            "responses": {
+              "200": {
+                "description": "Service-local status"
+              }
+            }
+          }
+        }
+      },
+      "components": {}
+    },
+    "governance/interim-release-policy.json": {
+      "schema_version": 1,
+      "policy_kind": "source_merge",
+      "repository": "appolon1908/Codestra-Camera-Gateway",
+      "authorization_date": "2026-11-02",
+      "required_checks": [
+        {
+          "context": "documentation-contract-source",
+          "integration_id": 15368,
+          "workflow": ".github/workflows/source-scope.yml"
+        }
+      ],
+      "replaces_contexts": [
+        "codestra-control-plane",
+        "codestra/control-plane"
+      ],
+      "preserve": [
+        "other_required_checks",
+        "review_requirements",
+        "ref_conditions",
+        "bypass_actors",
+        "enforcement",
+        "force_push_protection",
+        "deletion_protection",
+        "deployment_authority"
+      ],
+      "production_activation_authorized": false,
+      "note": "GitHub rulesets remain the enforcement authority. Documentation/contract-only validation denies application sources until vetted product CI is separately reviewed; it does not certify runtime or authorize deployment."
+    }
+  }
+}
