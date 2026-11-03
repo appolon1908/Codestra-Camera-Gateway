@@ -1,0 +1,81 @@
+# Local development only. Binds to 127.0.0.1; never expose this stack publicly.
+# Production traffic reaches the gateway only via Caddy -> Kong -> Middleware V3.
+#
+#   ./dev/bootstrap.sh                                   # creates dev token + dev secret files
+#   docker compose -f docker-compose.dev.yml up --build
+#   docker compose -f docker-compose.dev.yml --profile mock-camera up --build
+name: codestra-camera-gateway-dev
+
+services:
+  camera-gateway:
+    build: .
+    image: codestra/camera-gateway:dev
+    environment:
+      CAMERA_GATEWAY_ENV: development
+      CAMERA_GATEWAY_LOG_LEVEL: DEBUG
+      CAMERA_GATEWAY_API_TOKEN_FILE: /run/secrets/api-token
+      # Stand-in for files rendered by an OpenBao agent/CSI driver.
+      CAMERA_GATEWAY_SECRETS_DIR: /run/openbao
+      CAMERA_GATEWAY_ENABLE_MJPEG_PREVIEW: "true"
+      # Private effects require deliberate operator enablement and Middleware wrapping.
+      CAMERA_GATEWAY_ENABLE_PTZ: "false"
+      CAMERA_GATEWAY_ENABLE_CLIP_CAPTURE: "false"
+    volumes:
+      - gateway-data:/var/lib/camera-gateway
+      - ./dev/secrets/openbao:/run/openbao:ro
+      - ./dev/secrets/api-token:/run/secrets/api-token:ro
+    ports:
+      - "127.0.0.1:8080:8080"
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    # Production manifests should also set security_opt no-new-privileges:true. It is omitted
+    # here because some dev hosts (AppArmor + recent kernels) reject every exec with it.
+
+  # Mock RTSP camera: mediamtx server + ffmpeg publishing a test pattern with auth.
+  mock-rtsp:
+    profiles: [mock-camera]
+    image: bluenviron/mediamtx:1
+    environment:
+      MTX_PROTOCOLS: tcp
+      MTX_AUTHINTERNALUSERS_0_USER: admin
+      MTX_AUTHINTERNALUSERS_0_PASS: dev-camera-pass
+      MTX_AUTHINTERNALUSERS_0_PERMISSIONS_0_ACTION: read
+      MTX_AUTHINTERNALUSERS_1_USER: publisher
+      MTX_AUTHINTERNALUSERS_1_PASS: dev-publisher-pass
+      MTX_AUTHINTERNALUSERS_1_PERMISSIONS_0_ACTION: publish
+    ports:
+      - "127.0.0.1:8554:8554"
+
+  mock-publisher:
+    profiles: [mock-camera]
+    image: codestra/camera-gateway:dev
+    depends_on: [mock-rtsp]
+    user: "10001:10001"
+    entrypoint:
+      - ffmpeg
+      - -hide_banner
+      - -loglevel
+      - warning
+      - -re
+      - -f
+      - lavfi
+      - -i
+      - testsrc2=size=1280x720:rate=15
+      - -c:v
+      - libx264
+      - -preset
+      - ultrafast
+      - -tune
+      - zerolatency
+      - -g
+      - "30"
+      - -f
+      - rtsp
+      - -rtsp_transport
+      - tcp
+      - rtsp://publisher:dev-publisher-pass@mock-rtsp:8554/h264/ch1/main/av_stream
+    restart: on-failure
+
+volumes:
+  gateway-data:
